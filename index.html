@@ -123,6 +123,8 @@
       <option value="self introduction">자기소개</option>
     </select>
     <button id="savebtn">저장</button>
+    <button id="testbtn" style="background:var(--card2);border:1px solid var(--line);color:var(--txt);margin-top:8px">🔌 연결 테스트</button>
+    <div class="note" id="testresult" style="margin-top:8px"></div>
   </div>
 </div>
 
@@ -372,8 +374,10 @@ function scoreShadow(heard){
 function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function apiErr(e){
   busy=false;
-  if(String(e.message).includes('NO_KEY')){sysmsg('⚙️ 설정에서 Claude API 키를 먼저 입력하세요. (섀도잉 모드는 키 없이도 됩니다)');$('#setpanel').classList.add('on');}
-  else sysmsg('오류: '+e.message);
+  const m=String(e.message);
+  if(m.includes('NO_KEY')){sysmsg('⚙️ 설정에서 AI 제공자 선택 후 API 키를 먼저 입력하세요. (섀도잉 모드는 키 없이도 됩니다)');$('#setpanel').classList.add('on');}
+  else if(m.includes('Failed to fetch')){sysmsg('오류: 서버에 연결 못 함(Failed to fetch).\n• VPN/사설DNS/광고차단 앱을 끄고 다시 시도\n• 주소가 https://nahuly.github.io/ 가 맞는지(자물쇠🔒) 확인\n• 다른 와이파이/데이터로 시도\n⚙️의 「연결 테스트」로 점검해 보세요.');}
+  else sysmsg('오류: '+m);
   $('#hint').textContent='다시 시도하세요';
 }
 
@@ -393,6 +397,19 @@ function syncProviderUI(){
   fillModels(p);
 }
 $('#provider').onchange=syncProviderUI;
+$('#testbtn').onclick=async()=>{
+  const note=$('#testresult');note.textContent='테스트 중...';
+  cfg.provider=$('#provider').value;
+  const k=$('#apikey').value.trim(),m=$('#model').value;
+  if(cfg.provider==='gemini'){cfg.keyGemini=k;cfg.modelGemini=m;}else{cfg.keyClaude=k;cfg.modelClaude=m;}
+  try{
+    const out=await ask('Reply ONLY with JSON {"ok":true}',[{role:'user',content:'ping'}],50);
+    note.textContent='✅ 연결 성공! ('+cfg.provider+'/'+m+') 응답: '+out.slice(0,50);
+  }catch(e){
+    const msg=String(e.message);
+    note.textContent='❌ '+msg+(msg.includes('Failed to fetch')?'\n→ 네트워크 차단(VPN·사설DNS·광고차단) 또는 잘못된 주소(file://) 가능성. 위 안내 참고.':msg.includes('NO_KEY')?'\n→ 키를 입력하세요.':msg.match(/40[013]/)?'\n→ 키가 틀렸거나 권한/모델 문제. 키를 다시 확인하세요.':'');
+  }
+};
 $('#setbtn').onclick=()=>{$('#provider').value=cfg.provider;syncProviderUI();$('#level').value=cfg.level;$('#topic').value=cfg.topic;$('#setpanel').classList.add('on');};
 $('#setpanel').onclick=e=>{if(e.target.id==='setpanel')e.currentTarget.classList.remove('on');};
 $('#savebtn').onclick=()=>{
@@ -415,7 +432,7 @@ $('#speedbtn').onclick=()=>{
 };
 
 /* 시작 */
-sysmsg('🗣️ 스피킹 코치 v3 (Gemini·Claude) — 섀도잉부터 시작해요!\n(표현연습·Q&A는 ⚙️에서 AI 제공자 선택 + API 키 입력 후 사용)');
+sysmsg('🗣️ 스피킹 코치 v4 (Gemini·Claude·연결테스트) — 섀도잉부터 시작해요!\n(표현연습·Q&A는 ⚙️에서 AI 제공자 선택 + API 키 입력 후 사용)');
 nextTask();
 </script>
 </body>
