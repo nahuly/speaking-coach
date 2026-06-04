@@ -44,6 +44,22 @@
   .jp{color:var(--sub);font-size:14px;margin-left:2px}
   .ko{color:var(--sub);font-size:13px;margin-top:3px}
   .speak{display:inline-block;margin-left:6px;cursor:pointer;opacity:.7;font-size:13px}
+  .kbar{display:flex;gap:6px;margin-bottom:9px}
+  .kbar button{flex:1;padding:9px 2px;border-radius:9px;border:1px solid var(--line);background:var(--card2);color:var(--sub);font-size:12.5px;font-weight:700;cursor:pointer}
+  .kbar button.on{background:var(--accent2);color:#3a2636;border-color:var(--accent2)}
+  .kcard{align-self:stretch;text-align:center;padding:20px 14px}
+  .kbig{font-size:80px;line-height:1.05;font-weight:700}
+  .kromaji{font-size:24px;color:var(--accent2);font-weight:700;margin-top:2px}
+  .kemoji{font-size:38px;margin:8px 0}
+  .kmnemo{font-size:15px;color:var(--txt);line-height:1.55;margin-top:4px}
+  .knav{display:flex;gap:8px;margin-top:16px;justify-content:center}
+  .knav button{flex:1;padding:12px 0;border-radius:11px;border:1px solid var(--line);background:var(--card2);color:var(--txt);font-size:14px;font-weight:700;cursor:pointer}
+  .knav button.prim{background:var(--accent);color:#fff;border:none}
+  .kquiz{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+  .kquiz button{padding:16px 0;border-radius:12px;border:1px solid var(--line);background:var(--card2);color:var(--txt);font-size:20px;font-weight:700;cursor:pointer}
+  .kquiz button.right{background:var(--good);color:#10241c;border-color:var(--good)}
+  .kquiz button.wrong{background:var(--bad);color:#2a1010;border-color:var(--bad)}
+  .kscore{text-align:center;color:var(--sub);font-size:13px;margin-top:10px}
   footer{padding:12px;background:var(--card);border-top:1px solid var(--line);flex-shrink:0}
   .hint{text-align:center;color:var(--sub);font-size:12.5px;min-height:17px;margin-bottom:9px}
   .controls{display:flex;gap:9px;align-items:center}
@@ -71,8 +87,9 @@
 </header>
 
 <div class="modes">
-  <button data-mode="shadow" class="on">🔁 섀도잉</button>
-  <button data-mode="express">💡 표현연습</button>
+  <button data-mode="kana" class="on">🃏 카나</button>
+  <button data-mode="shadow">🔁 섀도잉</button>
+  <button data-mode="express">💡 표현</button>
   <button data-mode="qa">💬 회화</button>
 </div>
 
@@ -140,7 +157,7 @@ const MODELS={
   claude:[['claude-haiku-4-5-20251001','Claude Haiku 4.5 — 저렴'],['claude-sonnet-4-6','Claude Sonnet 4.6 — 똑똑']]
 };
 const curKey=()=>cfg.provider==='gemini'?cfg.keyGemini:cfg.keyClaude;
-let mode='shadow', history=[], busy=false, target='', tObj={say:'',read:'',ko:''};
+let mode='kana', history=[], busy=false, target='', tObj={say:'',read:'',ko:''};
 
 /* ---------- 출력 ---------- */
 function add(cls,txt){const d=document.createElement('div');d.className='msg '+cls;d.textContent=txt;feed.appendChild(d);scroll();return d;}
@@ -215,13 +232,168 @@ async function askClaude(system,messages,maxTok){
 }
 function parseJSON(s){try{return JSON.parse(s.slice(s.indexOf('{'),s.lastIndexOf('}')+1));}catch(e){return null;}}
 
+/* ---------- 카나 (연상 암기, 무료·오프라인) ---------- */
+const HIRA=[
+['あ','a','🅰️','알파벳 A에 꼬리 하나 더 → 아'],
+['い','i','🎏','잉어 깃발 두 개 나란히 "이~" → 이'],
+['う','u','🤧','코감기로 "우~" 하는 옆얼굴 → 우'],
+['え','e','🥷','에너지 넘쳐 펄쩍 뛰는 닌자 → 에'],
+['お','o','⛳','"오!" 골프공이 날아간다 → 오'],
+['か','ka','🗡️','칼(카타나) 휘두르는 모양 → 카'],
+['き','ki','🔑','열쇠(key) 모양 → 키'],
+['く','ku','🐦','뻐꾸기 새 부리 쿡쿡 → 쿠'],
+['け','ke','🪣','양동이(keg) 옆에 든 모양 → 케'],
+['こ','ko','🐟','잉어(koi) 두 마리 나란히 → 코'],
+['さ','sa','🥋','사무라이가 칼 뽑는 자세 → 사'],
+['し','shi','🎣','늘어진 낚싯바늘 → 시'],
+['す','su','🍭','소용돌이 막대사탕 → 스'],
+['せ','se','🦷','입 벌린 치과 의자 → 세'],
+['そ','so','🪡','지그재그 바느질(sew) → 소'],
+['た','ta','➕','t와 a가 합쳐진 모양 → 타'],
+['ち','chi','📣','"치어!" 응원하는 사람 → 치'],
+['つ','tsu','🌊','쓰나미 파도 한 줄 → 츠'],
+['て','te','✋','손(て=손) 펼친 모양 → 테'],
+['と','to','📌','발가락(toe)에 압정 콕 → 토'],
+['な','na','🙏','기도하는 수녀(nun) → 나'],
+['に','ni','🦵','무릎(knee) 꿇은 모양 → 니'],
+['ぬ','nu','🍜','꼬불 국수(noodle) 한 가닥 → 누'],
+['ね','ne','🐱','꼬리 도르르 만 고양이(neko) → 네'],
+['の','no','🚫','출입금지(no) 동그라미 → 노'],
+['は','ha','🎩','"하!" 모자(hat) 쓴 사람 → 하'],
+['ひ','hi','😁','활짝 웃는 입 "히~" → 히'],
+['ふ','fu','🗻','후지산 옆모습 → 후'],
+['へ','he','⛰️','산봉우리 하나 "헤" → 헤'],
+['ほ','ho','⛵','돛 단 배(homerun) → 호'],
+['ま','ma','👩','엄마(mama) 머리에 핀 → 마'],
+['み','mi','🔢','숫자 21처럼 보임 "미~" → 미'],
+['む','mu','🐮','소가 "무~" 우는 모양 → 무'],
+['め','me','👁️','눈(目=me) 동그라미 → 메'],
+['も','mo','🪱','낚시바늘에 지렁이(more) → 모'],
+['や','ya','🐃','야크(yak) 뿔 → 야'],
+['ゆ','yu','🐟','유유히 헤엄치는 물고기 → 유'],
+['よ','yo','🪀','요요(yo-yo) → 요'],
+['ら','ra','🐰','깡총 뛰는 토끼(rabbit) → 라'],
+['り','ri','🏞️','두 줄기 강물(river) → 리'],
+['る','ru','🐒','꼬리 말린 길(route) → 루'],
+['れ','re','🏃','달리는(run) 사람 다리 → 레'],
+['ろ','ro','🛣️','한 번 꺾인 길(road) → 로'],
+['わ','wa','🌀','소용돌이 "와우" → 와'],
+['を','wo','😮','입에 넣고 "오"(목적격, 발음은 오) → 오'],
+['ん','n','〰️','"응~" 받침 소리 → ㄴ/ㅇ'],
+];
+const KATA=[
+['ア','a','📡','안테나(antenna) 꺾인 모양 → 아'],
+['イ','i','🦅','독수리(eagle) 날개 두 줄 → 이'],
+['ウ','u','🏠','지붕 아래 "우" → 우'],
+['エ','e','🏗️','공사장 H빔/엘리베이터 → 에'],
+['オ','o','🙆','"오!" 손 든 사람 → 오'],
+['カ','ka','🗡️','칼 모양(히라가나 か와 닮음) → 카'],
+['キ','ki','🔑','열쇠(key) 두 갈래 → 키'],
+['ク','ku','🪃','부메랑/새 부리 → 쿠'],
+['ケ','ke','🍰','케이크 자르는 칼 → 케'],
+['コ','ko','📦','입 벌린 상자(box) → 코'],
+['サ','sa','🌵','선인장(saguaro) 풀 → 사'],
+['シ','shi','😏','삐딱하게 웃는 눈썹(점이 옆으로) → 시'],
+['ス','su','🎿','스키 점프대 → 스'],
+['セ','se','🦷','히라가나 せ와 닮은 입 → 세'],
+['ソ','so','🪡','바느질 한 땀(점이 위에서 아래) → 소'],
+['タ','ta','🦤','타조 머리 → 타'],
+['チ','chi','🧀','치즈 자르는 가위 → 치'],
+['ツ','tsu','🌊','물방울 둘이 위에서(점 두 개) → 츠'],
+['テ','te','🪑','테이블/안테나 → 테'],
+['ト','to','🪧','토템폴 막대 → 토'],
+['ナ','na','🔪','나이프(knife) 십자 → 나'],
+['ニ','ni','✌️','두 줄(二)=숫자 2 → 니'],
+['ヌ','nu','🥢','젓가락에 국수(noodle) → 누'],
+['ネ','ne','🐈','발톱 복잡한 고양이(neko) → 네'],
+['ノ','no','↗️','빗금 한 줄(no) → 노'],
+['ハ','ha','🩰','두 다리 벌린 "하" → 하'],
+['ヒ','hi','🗝️','칼자루/낫 모양 → 히'],
+['フ','fu','🗻','후지산 한쪽 비탈 → 후'],
+['ヘ','he','⛰️','히라가나 へ와 똑같은 산 → 헤'],
+['ホ','ho','🌲','한자 木(나무) 모양 → 호'],
+['マ','ma','🔻','마름모/엄마 손짓 → 마'],
+['ミ','mi','🤟','세 줄(三 비슷) 세 손가락 → 미'],
+['ム','mu','🐮','소 입(muu) 벌린 → 무'],
+['メ','me','❎','눈(目)에 X, 칼질 → 메'],
+['モ','mo','🪝','more 갈고리 → 모'],
+['ヤ','ya','🌴','야자수 가지 → 야'],
+['ユ','yu','🥤','U자 컵(you) → 유'],
+['ヨ','yo','🪮','빗(E 뒤집힌 모양) → 요'],
+['ラ','ra','🍜','라면 그릇 김 모락 → 라'],
+['リ','ri','🏞️','두 막대 강(river) → 리'],
+['ル','ru','🏃','달리는 다리(run) → 루'],
+['レ','re','✔️','체크 표시 다리 → 레'],
+['ロ','ro','⬜','네모난 길/입(road) → 로'],
+['ワ','wa','😮','입 벌린 "와우" → 와'],
+['ヲ','wo','🪧','막대에 걸침(거의 안 씀) → 오'],
+['ン','n','〰️','받침 n (シ와 헷갈리지 말기) → ㄴ/ㅇ'],
+];
+let kSet='hira', kView='study', kIdx=0, kQ=null, kRight=0, kTotal=0;
+const curKana=()=>kSet==='hira'?HIRA:KATA;
+function renderKana(){
+  setFooter(false); feed.innerHTML='';
+  const ctrl=document.createElement('div');ctrl.className='card';ctrl.style.alignSelf='stretch';
+  ctrl.innerHTML=
+    `<div class="kbar">
+       <button data-set="hira" class="${kSet==='hira'?'on':''}">ひらがな 히라가나</button>
+       <button data-set="kata" class="${kSet==='kata'?'on':''}">カタカナ 가타카나</button>
+     </div>
+     <div class="kbar">
+       <button data-view="study" class="${kView==='study'?'on':''}">📖 학습</button>
+       <button data-view="quiz" class="${kView==='quiz'?'on':''}">📝 퀴즈</button>
+     </div>`;
+  feed.appendChild(ctrl);
+  ctrl.querySelectorAll('[data-set]').forEach(b=>b.onclick=()=>{kSet=b.dataset.set;kIdx=0;kRight=0;kTotal=0;kQ=null;renderKana();});
+  ctrl.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{kView=b.dataset.view;kRight=0;kTotal=0;kQ=null;renderKana();});
+  if(kView==='study') renderStudy(); else renderQuiz();
+}
+function renderStudy(){
+  const arr=curKana();const [k,r,e,m]=arr[kIdx];
+  const c=document.createElement('div');c.className='card kcard';
+  c.innerHTML=`<div class="kbig">${k}</div><div class="kromaji">${r}</div><div class="kemoji">${e}</div><div class="kmnemo">${esc(m)}</div>
+    <div class="kscore">${kIdx+1} / ${arr.length}</div>
+    <div class="knav"><button id="kprev">⬅️ 이전</button><button id="ksound" class="prim">🔊 소리</button><button id="knext">다음 ➡️</button></div>`;
+  feed.appendChild(c);scroll();speak(k);
+  $('#kprev').onclick=()=>{kIdx=(kIdx-1+arr.length)%arr.length;renderKana();};
+  $('#knext').onclick=()=>{kIdx=(kIdx+1)%arr.length;renderKana();};
+  $('#ksound').onclick=()=>speak(k);
+}
+function newQuiz(){
+  const arr=curKana();const ans=Math.floor(Math.random()*arr.length);
+  const set=new Set([ans]);while(set.size<4)set.add(Math.floor(Math.random()*arr.length));
+  const ch=[...set];for(let j=ch.length-1;j>0;j--){const t=Math.floor(Math.random()*(j+1));[ch[j],ch[t]]=[ch[t],ch[j]];}
+  kQ={ans,choices:ch};
+}
+function renderQuiz(){
+  const arr=curKana();if(!kQ)newQuiz();
+  const k=arr[kQ.ans][0];
+  const btns=kQ.choices.map(ci=>`<button data-ci="${ci}">${arr[ci][1]}</button>`).join('');
+  const c=document.createElement('div');c.className='card kcard';
+  c.innerHTML=`<div class="kbig">${k}</div><div class="kscore">이 글자의 발음은?</div>
+    <div class="kquiz">${btns}</div>
+    <div class="kscore" id="kqs">점수 ${kRight} / ${kTotal}</div>
+    <div class="knav"><button id="ksound" class="prim">🔊 소리 듣기</button></div>`;
+  feed.appendChild(c);scroll();
+  $('#ksound').onclick=()=>speak(k);
+  c.querySelectorAll('[data-ci]').forEach(b=>b.onclick=()=>{
+    if(c.dataset.done)return; c.dataset.done='1';
+    const ci=parseInt(b.dataset.ci); kTotal++;
+    if(ci===kQ.ans){b.classList.add('right');kRight++;}
+    else{b.classList.add('wrong');c.querySelector(`[data-ci="${kQ.ans}"]`).classList.add('right');}
+    speak(k); $('#kqs').textContent=`점수 ${kRight} / ${kTotal}`;
+    setTimeout(()=>{newQuiz();renderKana();},1150);
+  });
+}
+
 /* ---------- 모드 전환 ---------- */
 document.querySelectorAll('.modes button').forEach(b=>b.onclick=()=>{
   if(busy)return;
   document.querySelectorAll('.modes button').forEach(x=>x.classList.remove('on'));
   b.classList.add('on');mode=b.dataset.mode;feed.innerHTML='';history=[];target='';
-  nextTask();
+  if(mode==='kana'){renderKana();}else{setFooter(true);nextTask();}
 });
+function setFooter(show){document.querySelector('footer').style.display=show?'':'none';}
 $('#nextbtn').onclick=()=>{if(!busy)nextTask();};
 $('#replaybtn').onclick=()=>{if(target)speak(target);};
 
@@ -409,8 +581,8 @@ $('#speedbtn').onclick=()=>{
 };
 
 /* 시작 */
-sysmsg('🇯🇵 일본어 스피킹 코치 v1 — 글자 못 읽어도 OK!\n로마자 보고 소리로 따라하세요. (모든 모드 API 키 필요, 영어 앱과 공유)');
-nextTask();
+sysmsg('🇯🇵 일본어 스피킹 코치 v2 — 🃏카나(연상암기·무료)부터 시작!\n섀도잉·표현·회화는 API 키 필요(영어 앱과 공유).');
+renderKana();
 </script>
 </body>
 </html>
