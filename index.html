@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>스피킹 코치</title>
+<style>
+  :root{
+    --bg:#0f1420; --card:#1a2235; --card2:#222d45; --line:#2d3a55;
+    --txt:#e8edf7; --sub:#9fb0cc; --accent:#5b8cff; --accent2:#3fd0a3;
+    --warn:#ffb85b; --bad:#ff7a7a; --good:#3fd0a3;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg);color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+    display:flex;flex-direction:column;height:100dvh;overflow:hidden;
+  }
+  header{
+    padding:14px 16px;background:var(--card);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px;flex-shrink:0;
+  }
+  header h1{font-size:17px;margin:0;font-weight:700;flex:1}
+  .iconbtn{background:var(--card2);border:1px solid var(--line);color:var(--txt);
+    width:38px;height:38px;border-radius:10px;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .modes{display:flex;gap:6px;padding:10px 12px;background:var(--card);border-bottom:1px solid var(--line);flex-shrink:0}
+  .modes button{flex:1;padding:9px 4px;border-radius:10px;border:1px solid var(--line);
+    background:var(--card2);color:var(--sub);font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.3}
+  .modes button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  #feed{flex:1;overflow-y:auto;padding:14px 12px 6px;display:flex;flex-direction:column;gap:12px}
+  .msg{max-width:90%;padding:11px 13px;border-radius:14px;font-size:15px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+  .bot{background:var(--card);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px}
+  .me{background:var(--accent);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+  .sys{align-self:center;color:var(--sub);font-size:12.5px;background:transparent;text-align:center;max-width:100%}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 13px;align-self:flex-start;max-width:95%;font-size:14px;line-height:1.55}
+  .card .row{display:flex;gap:7px;margin:5px 0;align-items:flex-start}
+  .tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;flex-shrink:0;margin-top:1px}
+  .t-nat{background:rgba(63,208,163,.18);color:var(--good)}
+  .t-gram{background:rgba(255,184,91,.18);color:var(--warn)}
+  .t-tip{background:rgba(91,140,255,.18);color:var(--accent)}
+  .t-say{background:rgba(255,122,122,.16);color:var(--bad)}
+  .card .en{font-weight:600}
+  .speak{display:inline-block;margin-left:6px;cursor:pointer;opacity:.7;font-size:13px}
+  .diff .ok{color:var(--good)} .diff .miss{color:var(--bad);text-decoration:underline}
+  footer{padding:12px;background:var(--card);border-top:1px solid var(--line);flex-shrink:0}
+  .hint{text-align:center;color:var(--sub);font-size:12.5px;min-height:17px;margin-bottom:9px}
+  .controls{display:flex;gap:9px;align-items:center}
+  #micbtn{flex:1;height:56px;border-radius:14px;border:none;background:var(--accent);color:#fff;
+    font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:.15s}
+  #micbtn.rec{background:var(--bad);animation:pulse 1.1s infinite}
+  #micbtn:disabled{opacity:.45}
+  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.02);filter:brightness(1.12)}}
+  .sidebtn{width:56px;height:56px;border-radius:14px;border:1px solid var(--line);background:var(--card2);color:var(--txt);font-size:20px;cursor:pointer}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:18px;z-index:10}
+  .overlay.on{display:flex}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;width:100%;max-width:420px;max-height:88dvh;overflow-y:auto}
+  .panel h2{margin:0 0 14px;font-size:16px}
+  .panel label{display:block;font-size:12.5px;color:var(--sub);margin:12px 0 5px;font-weight:600}
+  .panel input,.panel select{width:100%;padding:11px;border-radius:10px;border:1px solid var(--line);
+    background:var(--card2);color:var(--txt);font-size:14px}
+  .panel .note{font-size:11.5px;color:var(--sub);margin-top:6px;line-height:1.45}
+  .panel button{width:100%;margin-top:16px;padding:13px;border-radius:11px;border:none;background:var(--accent);color:#fff;font-weight:700;font-size:15px;cursor:pointer}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <h1>🗣️ 스피킹 코치</h1>
+  <button class="iconbtn" id="speedbtn" title="읽기 속도">🐢</button>
+  <button class="iconbtn" id="setbtn" title="설정">⚙️</button>
+</header>
+
+<div class="modes">
+  <button data-mode="shadow" class="on">🔁 섀도잉</button>
+  <button data-mode="express">💡 표현연습</button>
+  <button data-mode="qa">💬 Q&amp;A</button>
+</div>
+
+<div id="feed"></div>
+
+<footer>
+  <div class="hint" id="hint">아래 버튼을 눌러 시작하세요</div>
+  <div class="controls">
+    <button class="sidebtn" id="nextbtn" title="다음 문제">⏭️</button>
+    <button id="micbtn">🎤 시작</button>
+    <button class="sidebtn" id="replaybtn" title="다시 듣기">🔊</button>
+  </div>
+</footer>
+
+<!-- 설정 -->
+<div class="overlay" id="setpanel">
+  <div class="panel">
+    <h2>⚙️ 설정</h2>
+    <label>Claude API 키</label>
+    <input type="password" id="apikey" placeholder="sk-ant-...">
+    <div class="note">표현연습·Q&amp;A 모드에 필요해요. 키는 이 핸드폰에만 저장되고 어디로도 전송되지 않습니다(Anthropic API 직접 호출). 섀도잉 모드는 키 없이도 됩니다.</div>
+    <label>모델</label>
+    <select id="model">
+      <option value="claude-haiku-4-5-20251001">Haiku 4.5 — 가장 저렴 (추천)</option>
+      <option value="claude-sonnet-4-6">Sonnet 4.6 — 더 똑똑, 약간 비쌈</option>
+    </select>
+    <label>내 수준</label>
+    <select id="level">
+      <option value="beginner">초급 (피드백 한국어, 쉬운 문장)</option>
+      <option value="intermediate">중급</option>
+      <option value="advanced">고급</option>
+    </select>
+    <label>주제 (표현연습·Q&amp;A)</label>
+    <select id="topic">
+      <option value="daily life">일상생활</option>
+      <option value="travel">여행</option>
+      <option value="work and office">직장/업무</option>
+      <option value="food and restaurants">음식/식당</option>
+      <option value="hobbies">취미</option>
+      <option value="self introduction">자기소개</option>
+    </select>
+    <button id="savebtn">저장</button>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s), feed=$('#feed');
+const cfg={
+  key:localStorage.getItem('sc_key')||'',
+  model:localStorage.getItem('sc_model')||'claude-haiku-4-5-20251001',
+  level:localStorage.getItem('sc_level')||'beginner',
+  topic:localStorage.getItem('sc_topic')||'daily life',
+  rate:parseFloat(localStorage.getItem('sc_rate')||'0.85'),
+};
+let mode='shadow', target='', history=[], busy=false;
+
+/* ---------- 화면 출력 ---------- */
+function add(cls,txt){const d=document.createElement('div');d.className='msg '+cls;d.textContent=txt;feed.appendChild(d);scroll();return d;}
+function scroll(){feed.scrollTop=feed.scrollHeight;}
+function sysmsg(t){add('sys',t);}
+function speakIcon(text){const s=document.createElement('span');s.className='speak';s.textContent='🔊';s.onclick=()=>speak(text);return s;}
+
+/* ---------- 음성 합성(읽어주기) ---------- */
+let voices=[];
+function loadVoices(){voices=speechSynthesis.getVoices();}
+loadVoices(); if(speechSynthesis.onvoiceschanged!==undefined) speechSynthesis.onvoiceschanged=loadVoices;
+function speak(text){
+  if(!text)return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang='en-US'; u.rate=cfg.rate;
+  const v=voices.find(v=>/en-US/i.test(v.lang))||voices.find(v=>/^en/i.test(v.lang));
+  if(v)u.voice=v;
+  speechSynthesis.speak(u);
+}
+
+/* ---------- 음성 인식(말 → 글) ---------- */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let recog=null, recognizing=false, lastHeard='';
+if(SR){
+  recog=new SR(); recog.lang='en-US'; recog.interimResults=true; recog.maxAlternatives=1;
+  recog.onresult=e=>{let t='';for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript;lastHeard=t.trim();$('#hint').textContent='🎙️ '+lastHeard;};
+  recog.onerror=e=>{$('#hint').textContent='인식 오류: '+e.error+' (다시 시도)';stopRec();};
+  recog.onend=()=>{if(recognizing){recognizing=false;finishTurn();}};
+}
+function startRec(){
+  if(!recog){$('#hint').textContent='이 브라우저는 음성인식 미지원 — Chrome(안드로이드)이나 최신 Safari를 써보세요';return;}
+  lastHeard='';recognizing=true;
+  try{recog.start();}catch(e){}
+  $('#micbtn').classList.add('rec');$('#micbtn').textContent='⏹️ 멈춤';$('#hint').textContent='듣는 중... 말한 뒤 멈춤을 누르세요';
+}
+function stopRec(){recognizing=false;try{recog.stop();}catch(e){}$('#micbtn').classList.remove('rec');$('#micbtn').textContent='🎤 시작';}
+
+/* ---------- Claude API ---------- */
+async function ask(system,messages,maxTok=400){
+  if(!cfg.key)throw new Error('NO_KEY');
+  const r=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'content-type':'application/json','x-api-key':cfg.key,
+      'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:cfg.model,max_tokens:maxTok,system,messages})
+  });
+  if(!r.ok){const t=await r.text();throw new Error('API '+r.status+': '+t.slice(0,200));}
+  const d=await r.json();
+  return d.content.map(c=>c.text||'').join('');
+}
+function parseJSON(s){try{return JSON.parse(s.slice(s.indexOf('{'),s.lastIndexOf('}')+1));}catch(e){return null;}}
+
+/* ---------- 모드 전환 ---------- */
+document.querySelectorAll('.modes button').forEach(b=>b.onclick=()=>{
+  if(busy)return;
+  document.querySelectorAll('.modes button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');mode=b.dataset.mode;feed.innerHTML='';history=[];target='';
+  nextTask();
+});
+
+/* ---------- 다음 문제 ---------- */
+$('#nextbtn').onclick=()=>{if(!busy)nextTask();};
+$('#replaybtn').onclick=()=>{if(target)speak(target);};
+
+async function nextTask(){
+  if(mode==='shadow'){
+    busy=true;$('#hint').textContent='문장 준비 중...';
+    target=await getShadowSentence();
+    busy=false;
+    add('bot','🔁 따라 말해보세요:');
+    const c=document.createElement('div');c.className='card';
+    c.innerHTML='<div class="en">'+esc(target)+'</div>';
+    c.appendChild(speakIcon(target));feed.appendChild(c);scroll();
+    speak(target);$('#hint').textContent='🎤를 눌러 따라 말하세요';
+  }else if(mode==='express'){
+    busy=true;$('#hint').textContent='주제 준비 중...';
+    let ko='';
+    try{
+      const out=await ask(
+        `You make ONE short Korean sentence for an English ${cfg.level} learner to translate aloud. Topic: ${cfg.topic}. Output ONLY JSON: {"ko":"<한국어 문장>"}. Keep it natural and ${cfg.level==='beginner'?'very simple (5-8 words)':'realistic'}.`,
+        [{role:'user',content:'Give me one new sentence.'}],120);
+      ko=(parseJSON(out)||{}).ko||'';
+    }catch(e){return apiErr(e);}
+    busy=false;target='';
+    add('bot','💡 이걸 영어로 말해보세요:');
+    add('bot','「 '+ko+' 」');
+    history=[{role:'system_ko',content:ko}];
+    $('#hint').textContent='🎤를 눌러 영어로 말하세요';
+  }else{ // qa
+    busy=true;$('#hint').textContent='질문 준비 중...';
+    let q='';
+    try{
+      const out=await ask(
+        `You are a friendly English tutor doing speaking practice with a Korean ${cfg.level} learner. Topic: ${cfg.topic}. Ask ONE short, simple spoken-English question to start or continue. Output ONLY JSON: {"q":"<question>"}.`,
+        history.length?history.map(h=>({role:h.role,content:h.content})):[{role:'user',content:'Start the conversation.'}],150);
+      q=(parseJSON(out)||{}).q||'';
+    }catch(e){return apiErr(e);}
+    busy=false;target=q;
+    const c=document.createElement('div');c.className='msg bot';c.textContent='💬 '+q;c.appendChild(speakIcon(q));feed.appendChild(c);scroll();
+    speak(q);
+    history.push({role:'assistant',content:q});
+    $('#hint').textContent='🎤를 눌러 대답하세요';
+  }
+}
+
+/* 섀도잉 문장: 토큰 절약 위해 기본 내장, 키 있으면 가끔 새로 */
+const STARTER=[
+ "I usually wake up at seven in the morning.",
+ "Could you tell me how to get to the station?",
+ "I'd like a cup of coffee, please.",
+ "What do you usually do on the weekend?",
+ "I'm really looking forward to the trip.",
+ "Can I have the menu, please?",
+ "It was nice talking to you today.",
+ "I think it's going to rain this afternoon.",
+ "How long have you been working here?",
+ "Let me know if you need any help.",
+ "I'm sorry, but I can't make it tomorrow.",
+ "This is one of my favorite places in the city."
+];
+let starterIdx=0;
+async function getShadowSentence(){
+  if(cfg.key){
+    try{
+      const out=await ask(
+        `Make ONE natural spoken-English sentence for a Korean ${cfg.level} learner to shadow (repeat). Topic: ${cfg.topic}. ${cfg.level==='beginner'?'8-12 words, common words only.':'realistic, 10-16 words.'} Output ONLY JSON: {"s":"<sentence>"}.`,
+        [{role:'user',content:'one sentence'}],100);
+      const s=(parseJSON(out)||{}).s;if(s)return s;
+    }catch(e){/* 실패시 내장으로 */}
+  }
+  return STARTER[starterIdx++%STARTER.length];
+}
+
+/* ---------- 마이크 버튼 ---------- */
+$('#micbtn').onclick=()=>{
+  if(busy)return;
+  if(recognizing)stopRec(); else startRec();
+};
+
+async function finishTurn(){
+  stopRec();
+  const heard=lastHeard.trim();
+  if(!heard){$('#hint').textContent='못 들었어요. 다시 시도하세요';return;}
+  add('me',heard);
+  if(mode==='shadow'){ scoreShadow(heard); return; }
+  // express / qa → Claude 피드백
+  busy=true;$('#hint').textContent='피드백 생성 중...';
+  try{
+    let system,messages;
+    const lang=cfg.level==='beginner'?'Korean':'mostly Korean with key English terms';
+    if(mode==='express'){
+      const ko=(history.find(h=>h.role==='system_ko')||{}).content||'';
+      system=`A Korean ${cfg.level} learner is practicing speaking. They tried to say this Korean sentence in English: "${ko}". The speech-recognition text of their attempt is given (may contain recognition errors, judge leniently on tiny ones). Reply ONLY as JSON: {"natural":"<the natural English version of the target>","saidWell":"<short ${lang} note on what was good or what error they made>","tip":"<one short ${lang} expression/grammar tip>","pron":"<one ${lang} pronunciation note, or empty>"}`;
+      messages=[{role:'user',content:heard}];
+    }else{ // qa
+      history.push({role:'user',content:heard});
+      system=`You are a warm English speaking tutor for a Korean ${cfg.level} learner. The user's reply text comes from speech recognition (ignore minor recognition typos). Reply ONLY as JSON: {"natural":"<a more natural way to say the user's reply, or echo if already good>","saidWell":"<short ${lang} feedback on grammar/expression>","pron":"<one ${lang} pronunciation note or empty>","next":"<your short, encouraging follow-up question in simple English>"}`;
+      messages=history.filter(h=>h.role==='user'||h.role==='assistant').map(h=>({role:h.role,content:h.content}));
+    }
+    const out=await ask(system,messages,450);
+    const j=parseJSON(out);
+    busy=false;
+    if(!j){add('bot',out);return;}
+    renderFeedback(j);
+    if(mode==='qa'&&j.next){
+      target=j.next;history.push({role:'assistant',content:j.next});
+      $('#hint').textContent='🎤로 이어서 대답하세요';
+    }else{
+      $('#hint').textContent='⏭️로 다음 문장, 🎤로 다시 시도';
+    }
+  }catch(e){apiErr(e);}
+}
+
+function renderFeedback(j){
+  const c=document.createElement('div');c.className='card';
+  let h='';
+  if(j.natural){h+=`<div class="row"><span class="tag t-nat">자연스럽게</span><span><span class="en">${esc(j.natural)}</span></span></div>`;}
+  if(j.saidWell){h+=`<div class="row"><span class="tag t-gram">문법/표현</span><span>${esc(j.saidWell)}</span></div>`;}
+  if(j.tip){h+=`<div class="row"><span class="tag t-tip">팁</span><span>${esc(j.tip)}</span></div>`;}
+  if(j.pron){h+=`<div class="row"><span class="tag t-say">발음</span><span>${esc(j.pron)}</span></div>`;}
+  if(j.next){h+=`<div class="row"><span class="tag t-tip">다음</span><span><span class="en">${esc(j.next)}</span></span></div>`;}
+  c.innerHTML=h;
+  if(j.natural)c.appendChild(speakIcon(j.natural));
+  feed.appendChild(c);scroll();
+  if(j.next)setTimeout(()=>speak(j.next),400);
+  else if(j.natural)speak(j.natural);
+}
+
+/* 섀도잉 채점: 토큰 0, 단어 비교 */
+function scoreShadow(heard){
+  const norm=s=>s.toLowerCase().replace(/[^a-z0-9' ]/g,'').split(/\s+/).filter(Boolean);
+  const tw=norm(target), hw=new Set(norm(heard));
+  let hit=0,html='';
+  tw.forEach(w=>{const ok=hw.has(w);if(ok)hit++;html+=`<span class="${ok?'ok':'miss'}">${esc(w)}</span> `;});
+  const pct=Math.round(hit/Math.max(tw.length,1)*100);
+  const c=document.createElement('div');c.className='card';
+  c.innerHTML=`<div class="row"><span class="tag t-nat">정확도</span><span><b>${pct}%</b> (${hit}/${tw.length} 단어)</span></div>`
+    +`<div class="diff" style="margin-top:4px">${html}</div>`
+    +`<div class="row" style="margin-top:6px"><span class="tag t-tip">평</span><span>${pct>=85?'아주 좋아요! 👏':pct>=60?'좋아요, 빨간 단어 위주로 한 번 더 🔁':'천천히 다시 들어보고 따라해봐요'}</span></div>`;
+  c.appendChild(speakIcon(target));
+  feed.appendChild(c);scroll();
+  $('#hint').textContent='🔊 다시 듣기 · 🎤 다시 시도 · ⏭️ 다음 문장';
+}
+
+/* ---------- 유틸 ---------- */
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function apiErr(e){
+  busy=false;
+  if(String(e.message).includes('NO_KEY')){sysmsg('⚙️ 설정에서 Claude API 키를 먼저 입력하세요. (섀도잉 모드는 키 없이도 됩니다)');$('#setpanel').classList.add('on');}
+  else sysmsg('오류: '+e.message);
+  $('#hint').textContent='다시 시도하세요';
+}
+
+/* ---------- 설정 패널 ---------- */
+$('#setbtn').onclick=()=>{$('#apikey').value=cfg.key;$('#model').value=cfg.model;$('#level').value=cfg.level;$('#topic').value=cfg.topic;$('#setpanel').classList.add('on');};
+$('#setpanel').onclick=e=>{if(e.target.id==='setpanel')e.currentTarget.classList.remove('on');};
+$('#savebtn').onclick=()=>{
+  cfg.key=$('#apikey').value.trim();cfg.model=$('#model').value;cfg.level=$('#level').value;cfg.topic=$('#topic').value;
+  localStorage.setItem('sc_key',cfg.key);localStorage.setItem('sc_model',cfg.model);
+  localStorage.setItem('sc_level',cfg.level);localStorage.setItem('sc_topic',cfg.topic);
+  $('#setpanel').classList.remove('on');feed.innerHTML='';history=[];nextTask();
+};
+/* 읽기 속도 토글 */
+$('#speedbtn').onclick=()=>{
+  const speeds=[0.7,0.85,1.0];let i=speeds.indexOf(cfg.rate);i=(i+1)%speeds.length;
+  cfg.rate=speeds[i];localStorage.setItem('sc_rate',cfg.rate);
+  $('#speedbtn').textContent=cfg.rate<=0.7?'🐢':cfg.rate>=1?'🐇':'🐢';
+  $('#hint').textContent='읽기 속도: '+(cfg.rate===0.7?'느리게':cfg.rate===0.85?'보통':'빠르게');
+};
+
+/* 시작 */
+sysmsg('🗣️ 스피킹 코치 — 섀도잉부터 시작해요!\n(표현연습·Q&A는 ⚙️에서 API 키 입력 후 사용)');
+nextTask();
+</script>
+</body>
+</html>
