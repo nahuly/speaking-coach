@@ -94,14 +94,16 @@
 <div class="overlay" id="setpanel">
   <div class="panel">
     <h2>⚙️ 설정</h2>
-    <label>Claude API 키</label>
-    <input type="password" id="apikey" placeholder="sk-ant-...">
-    <div class="note">표현연습·Q&amp;A 모드에 필요해요. 키는 이 핸드폰에만 저장되고 어디로도 전송되지 않습니다(Anthropic API 직접 호출). 섀도잉 모드는 키 없이도 됩니다.</div>
-    <label>모델</label>
-    <select id="model">
-      <option value="claude-haiku-4-5-20251001">Haiku 4.5 — 가장 저렴 (추천)</option>
-      <option value="claude-sonnet-4-6">Sonnet 4.6 — 더 똑똑, 약간 비쌈</option>
+    <label>AI 제공자</label>
+    <select id="provider">
+      <option value="gemini">Google Gemini (개인 키, 무료한도 넉넉)</option>
+      <option value="claude">Anthropic Claude</option>
     </select>
+    <label id="keylabel">Gemini API 키</label>
+    <input type="password" id="apikey" placeholder="키 입력">
+    <div class="note" id="keynote"></div>
+    <label>모델</label>
+    <select id="model"></select>
     <label>내 수준</label>
     <select id="level">
       <option value="beginner">초급 (피드백 한국어, 쉬운 문장)</option>
@@ -124,12 +126,21 @@
 <script>
 const $=s=>document.querySelector(s), feed=$('#feed');
 const cfg={
-  key:localStorage.getItem('sc_key')||'',
-  model:localStorage.getItem('sc_model')||'claude-haiku-4-5-20251001',
+  provider:localStorage.getItem('sc_provider')||'gemini',
+  keyGemini:localStorage.getItem('sc_key_gemini')||'',
+  keyClaude:localStorage.getItem('sc_key_claude')||localStorage.getItem('sc_key')||'',
+  modelGemini:localStorage.getItem('sc_model_gemini')||'gemini-2.5-flash',
+  modelClaude:localStorage.getItem('sc_model_claude')||'claude-haiku-4-5-20251001',
   level:localStorage.getItem('sc_level')||'beginner',
   topic:localStorage.getItem('sc_topic')||'daily life',
   rate:parseFloat(localStorage.getItem('sc_rate')||'0.85'),
 };
+const MODELS={
+  gemini:[['gemini-2.5-flash','Gemini 2.5 Flash — 추천 (무료한도 넉넉)'],['gemini-2.0-flash','Gemini 2.0 Flash'],['gemini-2.5-pro','Gemini 2.5 Pro — 똑똑·비쌈']],
+  claude:[['claude-haiku-4-5-20251001','Claude Haiku 4.5 — 저렴'],['claude-sonnet-4-6','Claude Sonnet 4.6 — 똑똑']]
+};
+const curKey=()=>cfg.provider==='gemini'?cfg.keyGemini:cfg.keyClaude;
+const curModel=()=>cfg.provider==='gemini'?cfg.modelGemini:cfg.modelClaude;
 let mode='shadow', target='', history=[], busy=false;
 
 /* ---------- 화면 출력 ---------- */
@@ -169,16 +180,34 @@ function startRec(){
 }
 function stopRec(){recognizing=false;try{recog.stop();}catch(e){}$('#micbtn').classList.remove('rec');$('#micbtn').textContent='🎤 시작';}
 
-/* ---------- Claude API ---------- */
+/* ---------- AI API (Gemini / Claude) ---------- */
 async function ask(system,messages,maxTok=400){
-  if(!cfg.key)throw new Error('NO_KEY');
+  if(!curKey())throw new Error('NO_KEY');
+  return cfg.provider==='gemini'
+    ? askGemini(system,messages,maxTok)
+    : askClaude(system,messages,maxTok);
+}
+async function askGemini(system,messages,maxTok){
+  const model=cfg.modelGemini;
+  const contents=messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
+  const gc={maxOutputTokens:maxTok,temperature:0.7,responseMimeType:'application/json'};
+  if(/flash/.test(model))gc.thinkingConfig={thinkingBudget:0}; // 빈응답·토큰낭비 방지
+  const body={contents,generationConfig:gc};
+  if(system)body.system_instruction={parts:[{text:system}]};
+  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(cfg.keyGemini)}`,{
+    method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok){const t=await r.text();throw new Error('Gemini '+r.status+': '+t.slice(0,200));}
+  const d=await r.json();
+  return (d.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('');
+}
+async function askClaude(system,messages,maxTok){
   const r=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
-    headers:{'content-type':'application/json','x-api-key':cfg.key,
+    headers:{'content-type':'application/json','x-api-key':cfg.keyClaude,
       'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify({model:cfg.model,max_tokens:maxTok,system,messages})
+    body:JSON.stringify({model:cfg.modelClaude,max_tokens:maxTok,system,messages})
   });
-  if(!r.ok){const t=await r.text();throw new Error('API '+r.status+': '+t.slice(0,200));}
+  if(!r.ok){const t=await r.text();throw new Error('Claude '+r.status+': '+t.slice(0,200));}
   const d=await r.json();
   return d.content.map(c=>c.text||'').join('');
 }
@@ -254,7 +283,7 @@ const STARTER=[
 ];
 let starterIdx=0;
 async function getShadowSentence(){
-  if(cfg.key){
+  if(curKey()){
     try{
       const out=await ask(
         `Make ONE natural spoken-English sentence for a Korean ${cfg.level} learner to shadow (repeat). Topic: ${cfg.topic}. ${cfg.level==='beginner'?'8-12 words, common words only.':'realistic, 10-16 words.'} Output ONLY JSON: {"s":"<sentence>"}.`,
@@ -346,11 +375,31 @@ function apiErr(e){
 }
 
 /* ---------- 설정 패널 ---------- */
-$('#setbtn').onclick=()=>{$('#apikey').value=cfg.key;$('#model').value=cfg.model;$('#level').value=cfg.level;$('#topic').value=cfg.topic;$('#setpanel').classList.add('on');};
+function fillModels(p){
+  const sel=$('#model');sel.innerHTML='';
+  MODELS[p].forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;sel.appendChild(o);});
+  sel.value=p==='gemini'?cfg.modelGemini:cfg.modelClaude;
+}
+function syncProviderUI(){
+  const p=$('#provider').value;
+  $('#keylabel').textContent=(p==='gemini'?'Gemini':'Claude')+' API 키';
+  $('#apikey').value=p==='gemini'?cfg.keyGemini:cfg.keyClaude;
+  $('#keynote').innerHTML=p==='gemini'
+    ? '표현연습·Q&amp;A에 필요. <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a>에서 무료 발급. 키는 이 핸드폰에만 저장됩니다. 섀도잉은 키 없이도 됨.'
+    : '표현연습·Q&amp;A에 필요. <a href="https://console.anthropic.com/" target="_blank">console.anthropic.com</a>에서 발급. 키는 이 핸드폰에만 저장됩니다. 섀도잉은 키 없이도 됨.';
+  fillModels(p);
+}
+$('#provider').onchange=syncProviderUI;
+$('#setbtn').onclick=()=>{$('#provider').value=cfg.provider;syncProviderUI();$('#level').value=cfg.level;$('#topic').value=cfg.topic;$('#setpanel').classList.add('on');};
 $('#setpanel').onclick=e=>{if(e.target.id==='setpanel')e.currentTarget.classList.remove('on');};
 $('#savebtn').onclick=()=>{
-  cfg.key=$('#apikey').value.trim();cfg.model=$('#model').value;cfg.level=$('#level').value;cfg.topic=$('#topic').value;
-  localStorage.setItem('sc_key',cfg.key);localStorage.setItem('sc_model',cfg.model);
+  cfg.provider=$('#provider').value;
+  const k=$('#apikey').value.trim(),m=$('#model').value;
+  if(cfg.provider==='gemini'){cfg.keyGemini=k;cfg.modelGemini=m;}else{cfg.keyClaude=k;cfg.modelClaude=m;}
+  cfg.level=$('#level').value;cfg.topic=$('#topic').value;
+  localStorage.setItem('sc_provider',cfg.provider);
+  localStorage.setItem('sc_key_gemini',cfg.keyGemini);localStorage.setItem('sc_key_claude',cfg.keyClaude);
+  localStorage.setItem('sc_model_gemini',cfg.modelGemini);localStorage.setItem('sc_model_claude',cfg.modelClaude);
   localStorage.setItem('sc_level',cfg.level);localStorage.setItem('sc_topic',cfg.topic);
   $('#setpanel').classList.remove('on');feed.innerHTML='';history=[];nextTask();
 };
